@@ -1,0 +1,15 @@
+[project]
+name = "projects"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "click<8.2",
+    "fastapi[standard]>=0.128.0",
+    "pandas>=2.3.3",
+    "pillow>=12.1.0",
+    "psycopg2-binary>=2.9.11",
+    "setuptools>=75.8.1",
+    "uvicorn>=0.40.0",
+]
