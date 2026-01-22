@@ -1,1 +1,7 @@
-Nothing should be ignored since the changes only include source files (.vue files) and no build artifacts, dependencies, or temp files are present in the file change list.
+```markdown
+# Documentation and planning files
+ARCHITECTURE.md
+README_REFACTORED.md
+REFACTORING_PLAN.md
+REFACTORING_SUMMARY.md
+```

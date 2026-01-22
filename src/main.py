@@ -48,17 +48,17 @@ from utils.log.err_trace import extract_core_stack
 from utils.log.loop_trace import init_run_config, init_agent_config
 
 
-# 超时配置常量
-TIMEOUT_SECONDS = 900  # 15分钟
+# Timeout configuration constant
+TIMEOUT_SECONDS = 900  # 15 minutes
 
 class GraphService:
     def __init__(self):
         if not graph_helper.is_agent_proj():
             self.graph = graph_helper.get_graph_instance("graphs.graph")
 
-        # 用于跟踪正在运行的任务（使用asyncio.Task）
+        # Track running tasks (using asyncio.Task)
         self.running_tasks: Dict[str, asyncio.Task] = {}
-        # 错误分类器
+        # Error classifier
         self.error_classifier = ErrorClassifier()
 
     
@@ -73,7 +73,7 @@ class GraphService:
     def _sse_event(data: Any) -> str:
         return f"event: message\ndata: {json.dumps(data, ensure_ascii=False, default=str)}\n\n"
 
-    # 流式运行（原始迭代器）：本地调用使用
+    # Stream run (raw iterator): for local calls
     def stream(self, payload: Dict[str, Any], run_config: RunnableConfig, ctx=Context) -> Iterable[Any]:
         client_msg, session_id = to_client_message(payload)
         run_config["recursion_limit"] = 100
@@ -121,7 +121,7 @@ class GraphService:
             )
             yield error_msg
 
-    # 同步运行：本地/HTTP 通用
+    # Synchronous run: for local/HTTP use
     async def run(self, payload: Dict[str, Any], ctx=None) -> Dict[str, Any]:
         if ctx is None:
             ctx = new_context("run")
@@ -157,7 +157,7 @@ class GraphService:
             # 清理任务记录
             self.running_tasks.pop(run_id, None)
 
-    # 流式运行（SSE 格式化）：HTTP 路由使用
+    # Stream run (SSE formatted): for HTTP routing
     async def stream_sse(self, payload: Dict[str, Any], ctx=None) -> AsyncGenerator[str, None]:
         if ctx is None:
             ctx = new_context(method="stream_sse")
@@ -178,22 +178,22 @@ class GraphService:
             self.running_tasks.pop(run_id, None)
             cozeloop.flush()
 
-    # 取消执行 - 使用asyncio的标准方式
+    # Cancel execution - using standard asyncio mechanism
     def cancel_run(self, run_id: str, ctx: Optional[Context] = None) -> Dict[str, Any]:
         """
-        取消指定run_id的执行
+        Cancel execution for specified run_id
 
-        使用asyncio.Task.cancel()来取消任务,这是标准的Python异步取消机制。
-        LangGraph会在节点之间检查CancelledError,实现优雅的取消。
+        Uses asyncio.Task.cancel() to cancel the task, which is the standard Python async cancellation mechanism.
+        LangGraph checks for CancelledError between nodes to implement graceful cancellation.
         """
         logger.info(f"Attempting to cancel run_id: {run_id}")
 
-        # 查找对应的任务
+        # Find the corresponding task
         if run_id in self.running_tasks:
             task = self.running_tasks[run_id]
             if not task.done():
-                # 使用asyncio的标准取消机制
-                # 这会在下一个await点抛出CancelledError
+                # Use the standard asyncio cancellation mechanism
+                # This will raise CancelledError at the next await point
                 task.cancel()
                 logger.info(f"Cancellation requested for run_id: {run_id}")
                 return {
@@ -216,7 +216,7 @@ class GraphService:
                 "message": "No active task found with this run_id. Task may have already completed or run_id is invalid."
             }
 
-    # 运行指定节点：本地/HTTP 通用
+    # Run specific node: for local/HTTP use
     async def run_node(self, node_id: str, payload: Dict[str, Any], ctx=None) -> Any:
         if ctx is None or Context.run_id == "":
             ctx = new_context(method="node_run")
@@ -237,7 +237,7 @@ class GraphService:
         run_config = init_run_config(_graph, ctx)
         return await _graph.ainvoke(payload, config=run_config)
 
-    # 获取工作流的出入参Schema
+    # Get workflow input/output schema
     def graph_inout_schema(self) -> Any:
         if graph_helper.is_agent_proj():
             return {"input_schema": {}, "output_schema": {}}
@@ -509,7 +509,7 @@ async def http_stream_run(request: Request):
             )
             yield service._sse_event(error_msg)
 
-    # 注意：StreamingResponse会在后台运行generator
+    # Note: StreamingResponse will run the generator in the background
     response = StreamingResponse(cancellable_stream(), media_type="text/event-stream")
     return response
 
