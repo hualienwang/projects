@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from '@/views/Dashboard.vue'
+import APITestPage from '@/views/APITestPage.vue'
 
 const routes = [
   {
@@ -13,6 +14,14 @@ const routes = [
   {
     path: '/dashboard',
     redirect: '/'
+  },
+  {
+    path: '/api-test',
+    name: 'APITestPage',
+    component: APITestPage,
+    meta: {
+      title: 'API測試面板 - 瓊林圖書進銷存系統'
+    }
   },
   {
     path: '/:pathMatch(.*)*',
