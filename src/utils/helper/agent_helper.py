@@ -32,6 +32,15 @@ from utils.messages.server import (
 
 
 def to_stream_input(msg: ClientMessage) -> Dict[str, Any]:
+    """
+    Convert a client message to a stream input format suitable for LLM processing.
+    
+    Args:
+        msg: ClientMessage object containing user input
+        
+    Returns:
+        Dictionary with messages in the format expected by the LLM
+    """
     content_parts = []
     if msg and msg.content and msg.content.query and msg.content.query.prompt:
         for block in msg.content.query.prompt:
@@ -43,7 +52,7 @@ def to_stream_input(msg: ClientMessage) -> Dict[str, Any]:
                     and block.content.upload_file
             ):
                 file_info = block.content.upload_file
-                file_type , _ = infer_file_category(file_info.url)
+                file_type, _ = infer_file_category(file_info.url)
                 file_data = File(url=file_info.url, file_type=file_type)
                 # check is image
                 if file_data.file_type == "image":
@@ -94,6 +103,15 @@ def to_stream_input(msg: ClientMessage) -> Dict[str, Any]:
 
 
 def to_client_message(d: Dict[str, Any]) -> Tuple[ClientMessage, str]:
+    """
+    Convert a dictionary representation to a ClientMessage object and extract session ID.
+    
+    Args:
+        d: Dictionary containing message data
+        
+    Returns:
+        Tuple of (ClientMessage object, session ID string)
+    """
     prompt_list = d.get("content", {}).get("query", {}).get("prompt", [])
     blocks: List[PromptBlock] = []
     for b in prompt_list:
@@ -132,6 +150,15 @@ def to_client_message(d: Dict[str, Any]) -> Tuple[ClientMessage, str]:
 
 
 def _merge_tool_call_chunks(chunks: List[Any]) -> List[Dict[str, Any]]:
+    """
+    Merge fragmented tool call chunks into complete tool call definitions.
+    
+    Args:
+        chunks: List of tool call chunk objects or dictionaries
+        
+    Returns:
+        List of merged tool call dictionaries
+    """
     merged: Dict[int, Dict[str, Any]] = {}
     for chunk in chunks:
         # chunk can be dict or object
