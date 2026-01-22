@@ -1,1 +1,1 @@
-Nothing should be ignored since the changes only include source files (.vue files) and no build artifacts, dependencies, or temp files are present in the file change list.
+Nothing should be ignored in this case, as the changes only include markdown documentation files (.md) which are source/config files and not build artifacts, dependencies, or temporary files.
