@@ -1,11 +1,13 @@
 <template>
   <div id="app">
+    <Navigation />
     <router-view />
   </div>
 </template>
 
 <script setup>
 import { onMounted } from 'vue'
+import Navigation from '@/components/Navigation.vue'
 
 onMounted(() => {
   console.log('🚀 瓊林圖書進銷存系統 - 數據可視化前端已啟動')

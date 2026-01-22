@@ -1,14 +1,28 @@
-node_modules
-dist
-.DS_Store
+```
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+build/
+*.js.map
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Logs and temp files
+*.log
+*.tmp
 *.swp
-.git/*
+
+# Python (if applicable)
 __pycache__/
 *.pyc
-.venv/*
-*.o
-*.a
-/vendor
-*.egg-info/
-/.env
-.env
+*.pyo
+```
