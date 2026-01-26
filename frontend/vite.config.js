@@ -12,39 +12,13 @@ export default defineConfig({
     }
   },
   server: {
+    host: '0.0.0.0',
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
-        changeOrigin: true
-      },
-      '/run': {
-        target: 'http://localhost:5000',
-        changeOrigin: true
-      },
-      '/stream_run': {
-        target: 'http://localhost:5000',
-        changeOrigin: true
-      },
-      '/node_run': {
-        target: 'http://localhost:5000',
-        changeOrigin: true
-      },
-      '/cancel': {
-        target: 'http://localhost:5000',
-        changeOrigin: true
-      },
-      '/graph_parameter': {
-        target: 'http://localhost:5000',
-        changeOrigin: true
-      },
-      '/health': {
-        target: 'http://localhost:5000',
-        changeOrigin: true
-      },
-      '/v1': {
-        target: 'http://localhost:5000',
-        changeOrigin: true
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+        // rewrite: (path) => path.replace(/^\/api/, '')
       }
     }
   }

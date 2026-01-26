@@ -18,16 +18,22 @@
         </div>
       </div>
     </header>
-    
+
     <div class="role-description">
       <p>📋 {{ userStore.roleDescription }}</p>
     </div>
-    
+
+    <div class="debug-info" v-if="showDebug">
+      <p><strong>当前角色:</strong> {{ userStore.userRole }}</p>
+      <p><strong>图表数量:</strong> {{ chartCount }}</p>
+    </div>
+
     <div class="charts-grid">
       <!-- 销售趋势图 -->
       <div class="chart-card" :class="{ 'no-permission': !hasSalesTrendPermission }">
-        <SalesTrendChart 
+        <SalesTrendChart
           v-if="hasSalesTrendPermission"
+          :auto-load="true"
           @data-loaded="onDataLoaded"
           @error="onError"
         />
@@ -35,11 +41,12 @@
           <p>🔒 您當前角色無權訪問此圖表</p>
         </div>
       </div>
-      
+
       <!-- 商品销售排行 -->
       <div class="chart-card" :class="{ 'no-permission': !hasProductRankingPermission }">
-        <ProductRankingChart 
+        <ProductRankingChart
           v-if="hasProductRankingPermission"
+          :auto-load="true"
           @data-loaded="onDataLoaded"
           @error="onError"
         />
@@ -47,11 +54,12 @@
           <p>🔒 您當前角色無權訪問此圖表</p>
         </div>
       </div>
-      
+
       <!-- 库存状态分布 -->
       <div class="chart-card" :class="{ 'no-permission': !hasInventoryPermission }">
-        <InventoryDistributionChart 
+        <InventoryDistributionChart
           v-if="hasInventoryPermission"
+          :auto-load="true"
           @data-loaded="onDataLoaded"
           @error="onError"
         />
@@ -59,11 +67,12 @@
           <p>🔒 您當前角色無權訪問此圖表</p>
         </div>
       </div>
-      
+
       <!-- 客户消费分析 -->
       <div class="chart-card" :class="{ 'no-permission': !hasCustomerAnalysisPermission }">
-        <CustomerAnalysisChart 
+        <CustomerAnalysisChart
           v-if="hasCustomerAnalysisPermission"
+          :auto-load="true"
           @data-loaded="onDataLoaded"
           @error="onError"
         />
@@ -71,11 +80,12 @@
           <p>🔒 您當前角色無權訪問此圖表</p>
         </div>
       </div>
-      
+
       <!-- 供应商采购统计 -->
       <div class="chart-card" :class="{ 'no-permission': !hasSupplierStatsPermission }">
-        <SupplierStatsChart 
+        <SupplierStatsChart
           v-if="hasSupplierStatsPermission"
+          :auto-load="true"
           @data-loaded="onDataLoaded"
           @error="onError"
         />
@@ -84,7 +94,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Toast 通知 -->
     <div v-if="toast.show" class="toast" :class="toast.type">
       {{ toast.message }}
@@ -108,6 +118,10 @@ const toast = ref({
   message: '',
   type: 'success'
 })
+const showDebug = ref(true)
+const chartCount = ref(0)
+
+console.log('[Dashboard] 组件已创建')
 
 // 权限检查
 const hasSalesTrendPermission = computed(() => {
@@ -130,10 +144,22 @@ const hasSupplierStatsPermission = computed(() => {
   return userStore.userRole === 'admin'
 })
 
+// 计算可见的图表数量
+const visibleCharts = computed(() => {
+  let count = 0
+  if (hasSalesTrendPermission.value) count++
+  if (hasProductRankingPermission.value) count++
+  if (hasInventoryPermission.value) count++
+  if (hasCustomerAnalysisPermission.value) count++
+  if (hasSupplierStatsPermission.value) count++
+  return count
+})
+
 /**
  * 角色切换处理
  */
 const handleRoleChange = () => {
+  console.log('[Dashboard] 角色切换:', selectedRole.value)
   userStore.setRole(selectedRole.value)
   showToast(`角色已切換為: ${userStore.roleName}`, 'success')
 }
@@ -142,15 +168,16 @@ const handleRoleChange = () => {
  * 数据加载成功
  */
 const onDataLoaded = (data) => {
-  console.log('图表数据加载成功:', data)
+  console.log('[Dashboard] 图表数据加载成功:', data)
+  chartCount.value++
 }
 
 /**
  * 错误处理
  */
 const onError = (error) => {
+  console.error('[Dashboard] 图表加载错误:', error)
   showToast(`錯誤: ${error}`, 'error')
-  console.error('图表加载错误:', error)
 }
 
 /**
@@ -162,15 +189,20 @@ const showToast = (message, type = 'success') => {
     message,
     type
   }
-  
+
   setTimeout(() => {
     toast.value.show = false
   }, 3000)
 }
 
 onMounted(async () => {
+  console.log('[Dashboard] 组件已挂载')
+
   // 加载用户权限
   await userStore.loadPermissions()
+
+  console.log('[Dashboard] 用户权限:', userStore.permissions)
+  console.log('[Dashboard] 可见图表数量:', visibleCharts.value)
 })
 </script>
 
@@ -250,6 +282,24 @@ onMounted(async () => {
 .role-description p {
   margin: 0;
   font-size: 14px;
+}
+
+.debug-info {
+  margin-bottom: 20px;
+  padding: 12px 20px;
+  background: #fff7e6;
+  border-left: 4px solid #faad14;
+  border-radius: 4px;
+  color: #666;
+  font-size: 14px;
+}
+
+.debug-info p {
+  margin: 4px 0;
+}
+
+.debug-info strong {
+  color: #333;
 }
 
 .charts-grid {

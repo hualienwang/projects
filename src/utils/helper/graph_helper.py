@@ -22,26 +22,53 @@ def get_agent_instance(module_name, ctx):
 
 # return: func, input_class, output_class
 def get_graph_node_func_with_inout(graph, node_name):
+    # 第一轮：精确匹配函数名或节点ID
     for node_id, node in graph.nodes.items():
         if node_id == START or node_id == END:
             continue
 
         if node.data:
             _func = node.data.func
-            if _func.__name__ != node_name:
+
+            # 支持两种匹配方式：
+            # 1. 通过函数名匹配（如 check_inventory_node）
+            # 2. 通过节点ID匹配（如 check_inventory）
+            if _func.__name__ == node_name or node_id == node_name:
+                # 获取函数签名
+                sig = inspect.signature(_func)
+                # 获取参数列表
+                params = list(sig.parameters.values())
+                input_cls = None
+                if params:
+                    input_cls = params[0].annotation
+
+                output_cls = ParamExtractHelper.get_concrete_return_class(_func)
+
+                return _func, input_cls, output_cls
+
+    # 第二轮：模糊匹配（处理不同工作流之间的节点名稱差異）
+    # 例如：check_inventory_node -> check_inventory 或 check_order_inventory
+    if node_name.endswith('_node'):
+        base_name = node_name[:-5]  # 移除 '_node' 后缀
+        for node_id, node in graph.nodes.items():
+            if node_id == START or node_id == END:
                 continue
 
-            # 获取函数签名
-            sig = inspect.signature(_func)
-            # 获取参数列表
-            params = list(sig.parameters.values())
-            input_cls = None
-            if params:
-                input_cls = params[0].annotation
+            if node.data:
+                _func = node.data.func
+                # 检查节点ID或函数名是否包含基础名称
+                if base_name in node_id or base_name in _func.__name__:
+                    # 获取函数签名
+                    sig = inspect.signature(_func)
+                    # 获取参数列表
+                    params = list(sig.parameters.values())
+                    input_cls = None
+                    if params:
+                        input_cls = params[0].annotation
 
-            output_cls = ParamExtractHelper.get_concrete_return_class(_func)
+                    output_cls = ParamExtractHelper.get_concrete_return_class(_func)
 
-            return _func, input_cls, output_cls
+                    return _func, input_cls, output_cls
 
     return None, None, None
 

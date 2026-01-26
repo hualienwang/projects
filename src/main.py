@@ -607,6 +607,224 @@ async def health_check():
 async def http_graph_inout_parameter(request: Request):
     return service.graph_inout_schema()
 
+
+# ==================== Dashboard API Routes ====================
+
+@app.get("/api/dashboard/charts")
+async def get_dashboard_charts():
+    """获取可用图表列表"""
+    return {
+        "charts": [
+            {"id": "sales_trend", "name": "銷售趨勢圖", "description": "顯示銷售額隨時間的變化"},
+            {"id": "product_ranking", "name": "商品銷售排行", "description": "顯示熱銷商品排行榜"},
+            {"id": "inventory_distribution", "name": "庫存狀態分佈", "description": "顯示各類商品的庫存狀況"},
+            {"id": "customer_analysis", "name": "客戶消費分析", "description": "分析客戶分佈和消費習慣"},
+            {"id": "supplier_stats", "name": "供應商採購統計", "description": "統計供應商的訂單和庫存情況"}
+        ]
+    }
+
+
+@app.get("/api/dashboard/permissions/{user_role}")
+async def get_user_permissions(user_role: str):
+    """查询用户权限"""
+    permissions = {
+        "admin": {
+            "can_view_all": True,
+            "can_export": True,
+            "can_edit": True,
+            "allowed_charts": ["sales_trend", "product_ranking", "inventory_distribution", "customer_analysis", "supplier_stats"]
+        },
+        "manager": {
+            "can_view_all": True,
+            "can_export": True,
+            "can_edit": False,
+            "allowed_charts": ["sales_trend", "product_ranking", "inventory_distribution", "customer_analysis"]
+        },
+        "staff": {
+            "can_view_all": False,
+            "can_export": False,
+            "can_edit": False,
+            "allowed_charts": ["sales_trend", "product_ranking"]
+        },
+        "viewer": {
+            "can_view_all": False,
+            "can_export": False,
+            "can_edit": False,
+            "allowed_charts": ["sales_trend"]
+        }
+    }
+    return permissions.get(user_role, permissions["viewer"])
+
+
+@app.get("/api/dashboard/chart-types")
+async def get_chart_types():
+    """获取图表类型列表"""
+    return {
+        "chart_types": [
+            {"type": "line", "name": "折線圖", "description": "適合展示趨勢變化"},
+            {"type": "bar", "name": "柱狀圖", "description": "適合比較數據大小"},
+            {"type": "pie", "name": "餅圖", "description": "適合展示佔比關係"},
+            {"type": "doughnut", "name": "環形圖", "description": "適合展示佔比關係"},
+            {"type": "radar", "name": "雷達圖", "description": "適合多維數據比較"}
+        ]
+    }
+
+
+@app.get("/api/dashboard/roles")
+async def get_roles():
+    """获取角色列表"""
+    return {
+        "roles": [
+            {"id": "admin", "name": "管理員", "description": "擁有所有權限，可以查看和管理所有數據"},
+            {"id": "manager", "name": "經理", "description": "可以查看和管理銷售、庫存、客戶數據"},
+            {"id": "staff", "name": "員工", "description": "可以查看銷售和商品排行數據"},
+            {"id": "viewer", "name": "訪客", "description": "只能查看基本的銷售趨勢數據"}
+        ]
+    }
+
+
+@app.post("/api/dashboard/generate")
+async def generate_dashboard_chart(request: Request):
+    """生成图表数据"""
+    try:
+        payload = await request.json()
+        chart_type = payload.get("chart_type", "sales_trend")
+        user_role = payload.get("user_role", "viewer")
+        start_date = payload.get("start_date", "2024-01-01")
+        end_date = payload.get("end_date", "2024-12-31")
+
+        logger.info(f"Generating chart: type={chart_type}, role={user_role}")
+
+        # 根据图表类型返回模拟数据
+        if chart_type == "sales_trend":
+            return {
+                "chart_type": "line",
+                "title": "銷售趨勢圖",
+                "labels": ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"],
+                "datasets": [
+                    {
+                        "label": "銷售額 (萬元)",
+                        "data": [120, 150, 180, 220, 280, 350, 420, 380, 450, 520, 580, 650],
+                        "borderColor": "#4CAF50",
+                        "backgroundColor": "rgba(76, 175, 80, 0.2)"
+                    },
+                    {
+                        "label": "利潤 (萬元)",
+                        "data": [40, 50, 60, 75, 95, 120, 145, 130, 155, 180, 200, 225],
+                        "borderColor": "#2196F3",
+                        "backgroundColor": "rgba(33, 150, 243, 0.2)"
+                    }
+                ],
+                "summary": {
+                    "total_sales": 4340,
+                    "total_profit": 1485,
+                    "growth_rate": "+15.2%"
+                }
+            }
+        elif chart_type == "product_ranking":
+            return {
+                "chart_type": "bar",
+                "title": "商品銷售排行 Top 10",
+                "labels": ["哈利波特", "小王子", "老人與海", "1984", "三體", "百年孤獨", "福爾摩斯", "傲慢與偏見", "紅樓夢", "西遊記"],
+                "datasets": [
+                    {
+                        "label": "銷售量 (本)",
+                        "data": [1250, 980, 870, 750, 680, 620, 580, 520, 480, 450],
+                        "backgroundColor": [
+                            "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF",
+                            "#FF9F40", "#FF6384", "#C9CBCF", "#36A2EB", "#FFCE56"
+                        ]
+                    }
+                ],
+                "summary": {
+                    "best_seller": "哈利波特",
+                    "best_seller_count": 1250,
+                    "total_products": 156,
+                    "active_products": 98
+                }
+            }
+        elif chart_type == "inventory_distribution":
+            return {
+                "chart_type": "doughnut",
+                "title": "庫存狀態分佈",
+                "labels": ["正常", "低庫存", "庫存不足", "庫存積壓"],
+                "datasets": [
+                    {
+                        "data": [65, 15, 12, 8],
+                        "backgroundColor": [
+                            "#4CAF50",  # 正常 - 綠色
+                            "#FF9800",  # 低庫存 - 橙色
+                            "#F44336",  # 庫存不足 - 紅色
+                            "#9E9E9E"   # 庫存積壓 - 灰色
+                        ]
+                    }
+                ],
+                "summary": {
+                    "total_products": 156,
+                    "low_stock": 23,
+                    "out_of_stock": 18,
+                    "overstock": 13
+                }
+            }
+        elif chart_type == "customer_analysis":
+            return {
+                "chart_type": "pie",
+                "title": "客戶消費分佈",
+                "labels": ["普通會員", "銀卡會員", "金卡會員", "白金會員", "鑽石會員"],
+                "datasets": [
+                    {
+                        "data": [850, 450, 280, 120, 45],
+                        "backgroundColor": [
+                            "#9E9E9E",  # 普通 - 灰色
+                            "#B0BEC5",  # 銀卡 - 銀灰色
+                            "#FFD700",  # 金卡 - 金色
+                            "#81C784",  # 白金 - 淡綠色
+                            "#2196F3"   # 鑽石 - 藍色
+                        ]
+                    }
+                ],
+                "summary": {
+                    "total_customers": 1745,
+                    "vip_customers": 445,
+                    "avg_consumption": 520,
+                    "loyalty_rate": "78.5%"
+                }
+            }
+        elif chart_type == "supplier_stats":
+            return {
+                "chart_type": "bar",
+                "title": "供應商採購統計",
+                "labels": ["聯合出版", "商務印書館", "人民文學", "中華書局", "三聯書店", "譯林出版社", "上海譯文", "浙江文藝"],
+                "datasets": [
+                    {
+                        "label": "採購金額 (萬元)",
+                        "data": [850, 720, 680, 590, 520, 480, 420, 380],
+                        "backgroundColor": "#2196F3"
+                    },
+                    {
+                        "label": "訂單數量",
+                        "data": [156, 142, 128, 115, 102, 95, 88, 75],
+                        "backgroundColor": "#FF9800"
+                    }
+                ],
+                "summary": {
+                    "total_suppliers": 28,
+                    "active_suppliers": 22,
+                    "total_purchase": 4640,
+                    "avg_order_value": 3.2
+                }
+            }
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown chart type: {chart_type}")
+
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail="Invalid JSON format")
+    except Exception as e:
+        logger.error(f"Error generating chart: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== End Dashboard API Routes ====================
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Start FastAPI server")
     parser.add_argument("-m", type=str, default="http", help="Run mode, support http,flow,node")
@@ -635,7 +853,7 @@ def start_http_server(port):
         reload = True
 
     logger.info(f"Start HTTP Server, Port: {port}, Workers: {workers}")
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=reload, workers=workers)
+    uvicorn.run("main:app", host="127.0.0.1", port=port, reload=reload, workers=workers)
 
 if __name__ == "__main__":
     args = parse_args()

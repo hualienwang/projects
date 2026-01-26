@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>按鈕功能診斷工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            padding: 10px 20px;
+            background: #409eff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #66b1ff;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        button.success {
+            background: #67c23a;
+        }
+        button.error {
+            background: #f56c6c;
+        }
+        button.warning {
+            background: #e6a23c;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f5f7fa;
+            border-radius: 4px;
+            border-left: 4px solid #409eff;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .result.success {
+            border-left-color: #67c23a;
+        }
+        .result.error {
+            border-left-color: #f56c6c;
+        }
+        .info-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 按鈕功能診斷工具</h1>
+
+        <div class="info-box">
+            <strong>📋 說明：</strong>
+            此頁面用於診斷前端頁面中的按鈕點擊事件是否正常工作。請按照以下步驟進行測試：
+            <ol>
+                <li>打開瀏覽器的開發者工具（F12）</li>
+                <li>切換到 Console（控制台）標籤頁</li>
+                <li>點擊下方各個測試按鈕</li>
+                <li>觀察控制台輸出和頁面顯示結果</li>
+            </ol>
+        </div>
+
+        <div class="section">
+            <h3>測試 1: 基礎按鈕功能</h3>
+            <button onclick="testBasicButton()">🔧 測試基礎按鈕</button>
+            <div id="basicResult" class="result">點擊上方按鈕測試...</div>
+        </div>
+
+        <div class="section">
+            <h3>測試 2: API 連接測試</h3>
+            <button onclick="testAPIConnection()">🔧 API 測試</button>
+            <button onclick="testAPIWithAxios()">🔧 API 測試 (Axios)</button>
+            <div id="apiResult" class="result">點擊上方按鈕測試 API 連接...</div>
+        </div>
+
+        <div class="section">
+            <h3>測試 3: 按鈕狀態測試</h3>
+            <button id="disableTestBtn" onclick="testDisableButton()">🔧 測試按鈕禁用</button>
+            <button onclick="resetDisableButton()">🔄 重置按鈕</button>
+            <div id="disableResult" class="result">點擊上方按鈕測試...</div>
+        </div>
+
+        <div class="section">
+            <h3>測試 4: 多次點擊測試</h3>
+            <button id="multiClickBtn" onclick="testMultiClick()">🔧 多次點擊測試</button>
+            <div id="multiClickResult" class="result">點擊上方按鈕測試...</div>
+        </div>
+
+        <div class="section">
+            <h3>測試 5: 異步操作測試</h3>
+            <button id="asyncBtn" onclick="testAsyncOperation()">🔧 異步操作測試</button>
+            <div id="asyncResult" class="result">點擊上方按鈕測試...</div>
+        </div>
+
+        <div class="section">
+            <h3>📊 控制台輸出</h3>
+            <div id="consoleOutput" class="console-output">等待操作...</div>
+        </div>
+    </div>
+
+    <script>
+        // 工具函數：記錄到控制台和頁面
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}`;
+
+            // 輸出到瀏覽器控制台
+            console.log(`%c${logMessage}`, type === 'error' ? 'color: red' : type === 'success' ? 'color: green' : 'color: blue');
+
+            // 顯示在頁面上
+            const consoleDiv = document.getElementById('consoleOutput');
+            consoleDiv.innerHTML += `<div style="color: ${type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : '#409eff'}">${logMessage}</div>`;
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        // 測試 1: 基礎按鈕功能
+        function testBasicButton() {
+            log('✅ 基礎按鈕點擊事件已觸發！', 'success');
+            showResult('basicResult', '✅ 基礎按鈕功能正常！點擊事件已成功觸發。', 'success');
+        }
+
+        // 測試 2: API 連接測試
+        function testAPIConnection() {
+            log('🔧 開始測試 API 連接...', 'info');
+            showResult('apiResult', '⏳ 正在測試 API 連接...', 'info');
+
+            fetch('/api/dashboard/charts', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                log(`✅ API 響應狀態: ${response.status}`, 'info');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                log('✅ API 連接成功！', 'success');
+                log(`📊 響應數據: ${JSON.stringify(data, null, 2)}`, 'info');
+                showResult('apiResult', `✅ API 連接成功！\n\n狀態: 200 OK\n數據: ${JSON.stringify(data, null, 2)}`, 'success');
+            })
+            .catch(error => {
+                log(`❌ API 連接失敗: ${error.message}`, 'error');
+                showResult('apiResult', `❌ API 連接失敗！\n\n錯誤: ${error.message}`, 'error');
+            });
+        }
+
+        // 測試 2: 使用 Axios 測試 API
+        function testAPIWithAxios() {
+            log('🔧 開始測試 API 連接 (Axios)...', 'info');
+            showResult('apiResult', '⏳ 正在測試 API 連接 (Axios)...', 'info');
+
+            // 動態加載 Axios
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js';
+            script.onload = function() {
+                axios.get('/api/dashboard/charts', {
+                    timeout: 10000
+                })
+                .then(response => {
+                    log('✅ Axios API 連接成功！', 'success');
+                    log(`📊 響應數據: ${JSON.stringify(response.data, null, 2)}`, 'info');
+                    showResult('apiResult', `✅ Axios API 連接成功！\n\n狀態: ${response.status}\n數據: ${JSON.stringify(response.data, null, 2)}`, 'success');
+                })
+                .catch(error => {
+                    log(`❌ Axios API 連接失敗: ${error.message}`, 'error');
+                    showResult('apiResult', `❌ Axios API 連接失敗！\n\n錯誤: ${error.message}`, 'error');
+                });
+            };
+            script.onerror = function() {
+                log('❌ Axios 載入失敗', 'error');
+                showResult('apiResult', '❌ Axios 腳本載入失敗', 'error');
+            };
+            document.head.appendChild(script);
+        }
+
+        // 測試 3: 按鈕禁用測試
+        let disableTestCount = 0;
+        function testDisableButton() {
+            disableTestCount++;
+            const btn = document.getElementById('disableTestBtn');
+
+            log(`🔧 按鈕禁用測試 - 第 ${disableTestCount} 次點擊`, 'info');
+
+            if (btn.disabled) {
+                log('⚠️ 按鈕已被禁用，點擊無效', 'error');
+                showResult('disableResult', `⚠️ 按鈕已被禁用，點擊無效。\n\n這是正常行為，因為按鈕的 disabled 屬性設置為 true。`, 'error');
+                return;
+            }
+
+            // 禁用按鈕
+            btn.disabled = true;
+            btn.textContent = '🔧 已禁用';
+            btn.classList.add('warning');
+
+            log('✅ 按鈕已禁用', 'success');
+            showResult('disableResult', `✅ 按鈕已成功禁用！\n\n現在按鈕將不再響應點擊事件。\n點擊「重置按鈕」來恢復功能。`, 'success');
+        }
+
+        function resetDisableButton() {
+            const btn = document.getElementById('disableTestBtn');
+            btn.disabled = false;
+            btn.textContent = '🔧 測試按鈕禁用';
+            btn.classList.remove('warning');
+
+            log('🔄 按鈕已重置', 'success');
+            showResult('disableResult', '✅ 按鈕已重置，可以再次進行測試。', 'success');
+        }
+
+        // 測試 4: 多次點擊測試
+        let multiClickCount = 0;
+        function testMultiClick() {
+            multiClickCount++;
+            log(`🔧 多次點擊測試 - 第 ${multiClickCount} 次點擊`, 'info');
+            showResult('multiClickResult', `✅ 已點擊 ${multiClickCount} 次！\n\n按鈕響應正常，可以連續點擊。`, 'success');
+        }
+
+        // 測試 5: 異步操作測試
+        function testAsyncOperation() {
+            const btn = document.getElementById('asyncBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 處理中...';
+
+            log('🔧 開始異步操作測試...', 'info');
+            showResult('asyncResult', '⏳ 正在執行異步操作，請稍候...', 'info');
+
+            // 模擬異步操作
+            setTimeout(() => {
+                log('✅ 異步操作完成！', 'success');
+                showResult('asyncResult', '✅ 異步操作測試成功！\n\n按鈕在操作期間被禁用，操作完成後恢復。這是處理異步操作的正確方式。', 'success');
+
+                btn.disabled = false;
+                btn.textContent = '🔧 異步操作測試';
+            }, 2000);
+        }
+
+        // 頁面加載時的初始化
+        window.addEventListener('load', () => {
+            log('📄 頁面已加載完成', 'success');
+            log('🌐 當前 URL: ' + window.location.href, 'info');
+            log('🔍 瀏覽器: ' + navigator.userAgent, 'info');
+
+            // 檢查 JavaScript 是否正常工作
+            document.getElementById('basicResult').textContent = '✅ JavaScript 已正常加載，點擊按鈕進行測試。';
+            document.getElementById('basicResult').className = 'result success';
+        });
+    </script>
+</body>
+</html>

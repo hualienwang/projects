@@ -8,11 +8,6 @@
           <option :value="30">最近 30 天</option>
           <option :value="90">最近 90 天</option>
         </select>
-        <select v-model="topN" @change="loadData">
-          <option :value="5">Top 5</option>
-          <option :value="10">Top 10</option>
-          <option :value="20">Top 20</option>
-        </select>
       </div>
     </div>
     
@@ -33,7 +28,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto'
 import { useUserStore } from '@/stores/user'
 import { generateChart } from '@/api/dashboard'
@@ -53,7 +48,6 @@ const chartInstance = ref(null)
 const loading = ref(false)
 const error = ref('')
 const days = ref(30)
-const topN = ref(10)
 
 /**
  * 加载数据
@@ -63,14 +57,14 @@ const loadData = async () => {
     chartInstance.value.destroy()
     chartInstance.value = null
   }
-  
+
   loading.value = true
   error.value = ''
-  
+
   const endDate = new Date()
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - days.value)
-  
+
   try {
     const response = await generateChart({
       user_id: userStore.userId,
@@ -79,64 +73,78 @@ const loadData = async () => {
       start_date: startDate.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0]
     })
-    
+
     if (response.success && response.has_permission) {
-      // 过滤前N个客户
-      const filteredData = filterTopN(response.chart_data, topN.value)
-      const filteredConfig = { ...response.chart_config, data: filteredData }
-      
-      renderChart(filteredConfig)
-      emit('data-loaded', filteredData)
+      // 直接使用 chart_config，因為圖表數據已經在裡面了
+      // chart_data 是結構化數據（total_customers 等），不需要過濾
+      loading.value = false
+
+      // 等待 DOM 更新，確保 Canvas 元素已經渲染
+      await nextTick()
+      await nextTick()
+
+      renderChart(response.chart_config)
+      emit('data-loaded', response.chart_data)
     } else {
       error.value = response.message || '權限不足或數據加載失敗'
       emit('error', error.value)
+      loading.value = false
     }
   } catch (err) {
     console.error('加载客户分析数据失败:', err)
     error.value = '網絡錯誤，請稍後重試'
-    emit('error', error.value)
-  } finally {
     loading.value = false
+    emit('error', error.value)
   }
-}
-
-/**
- * 过滤前N个客户
- */
-const filterTopN = (chartData, n) => {
-  const result = { ...chartData }
-  
-  if (result.labels && result.labels.length > n) {
-    result.labels = result.labels.slice(0, n)
-    if (result.datasets && result.datasets[0]) {
-      result.datasets[0].data = result.datasets[0].data.slice(0, n)
-    }
-  }
-  
-  return result
 }
 
 /**
  * 渲染图表
  */
-const renderChart = (config) => {
-  if (!chartRef.value) return
-  
+const renderChart = async (config) => {
+  console.log('[CustomerAnalysisChart] 开始渲染图表...')
+
+  // 重試機制：等待 Canvas 元素渲染
+  let retryCount = 0
+  const maxRetries = 5
+
+  while (retryCount < maxRetries) {
+    if (chartRef.value) {
+      console.log('[CustomerAnalysisChart] Canvas 元素已找到！')
+      break
+    }
+
+    console.warn('[CustomerAnalysisChart] Canvas 元素不存在，等待 DOM 更新...')
+    await nextTick()
+    retryCount++
+  }
+
+  if (!chartRef.value) {
+    console.error('[CustomerAnalysisChart] Canvas 元素不存在！')
+    return
+  }
+
   const ctx = chartRef.value.getContext('2d')
-  
+
+  // 深拷贝配置，避免修改原始数据
+  const chartConfig = JSON.parse(JSON.stringify(config))
+
   // 更新图表标题
-  if (config.options && config.options.plugins) {
-    config.options.plugins.title = {
+  if (chartConfig.options && chartConfig.options.plugins) {
+    chartConfig.options.plugins.title = {
       display: true,
-      text: `客戶消費排行 Top ${topN.value} - 最近 ${days.value} 天`,
+      text: `客戶消費分析 - 最近 ${days.value} 天`,
       font: {
         size: 16,
         weight: 'bold'
       }
     }
   }
-  
-  chartInstance.value = new Chart(ctx, config)
+
+  console.log('[CustomerAnalysisChart] Chart 配置:', chartConfig.type, 'Labels:', chartConfig.data?.labels)
+
+  chartInstance.value = new Chart(ctx, chartConfig)
+  console.log('[CustomerAnalysisChart] 图表创建成功！')
 }
 
 /**
@@ -148,8 +156,10 @@ watch(() => userStore.userRole, () => {
   }
 })
 
-onMounted(() => {
+onMounted(async () => {
   if (props.autoLoad) {
+    await nextTick()
+    await nextTick()
     loadData()
   }
 })

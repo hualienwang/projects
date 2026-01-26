@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>客戶消費分析測試</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .test-panel {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .test-panel h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            padding: 10px 20px;
+            background: #409eff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #66b1ff;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f0f9ff;
+            border-radius: 4px;
+            border-left: 4px solid #409eff;
+        }
+        .controls label {
+            margin-right: 15px;
+            font-weight: bold;
+        }
+        .controls select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f5f7fa;
+            border-radius: 4px;
+            border-left: 4px solid #409eff;
+        }
+        .result.success {
+            border-left-color: #67c23a;
+        }
+        .result.error {
+            border-left-color: #f56c6c;
+        }
+        .result pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .chart-wrapper {
+            width: 100%;
+            max-width: 500px;
+            margin: 20px auto;
+            text-align: center;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #409eff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .debug-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff7e6;
+            border-radius: 4px;
+            border-left: 4px solid #faad14;
+            font-size: 12px;
+        }
+        .debug-info h4 {
+            margin-top: 0;
+            color: #333;
+        }
+        .debug-item {
+            margin: 5px 0;
+            padding: 8px;
+            background: #fff;
+            border-radius: 4px;
+            border: 1px solid #ffd591;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 客戶消費分析圖表測試</h1>
+
+        <div class="test-panel">
+            <h3>測試步驟</h3>
+            <div class="controls">
+                <label>時間範圍:</label>
+                <select id="daysSelect">
+                    <option value="7">最近 7 天</option>
+                    <option value="30" selected>最近 30 天</option>
+                    <option value="90">最近 90 天</option>
+                </select>
+            </div>
+            <button id="testAPIBtn" onclick="testAPI()">步驟 1: 測試 API</button>
+            <button id="testParseBtn" onclick="testParse()" disabled>步驟 2: 測試數據解析</button>
+            <button id="testRenderBtn" onclick="testRender()" disabled>步驟 3: 渲染圖表</button>
+            <button id="resetBtn" onclick="reset()">重置</button>
+
+            <div id="result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-panel">
+            <h3>圖表顯示</h3>
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div><p>載入中...</p>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="customerChart"></canvas>
+            </div>
+        </div>
+
+        <div class="test-panel">
+            <h3>調試信息</h3>
+            <div id="debugInfo" class="debug-info">
+                <h4>執行日誌</h4>
+                <div id="logContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script>
+        let chartInstance = null;
+        let apiResponse = null;
+        const logs = [];
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            logs.push(logEntry);
+            updateLogDisplay();
+            console.log(logEntry);
+        }
+
+        function updateLogDisplay() {
+            const container = document.getElementById('logContainer');
+            container.innerHTML = logs.map(log => {
+                return `<div class="debug-item">${log}</div>`;
+            }).join('');
+        }
+
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = message;
+        }
+
+        async function testAPI() {
+            const btn = document.getElementById('testAPIBtn');
+            btn.disabled = true;
+            btn.textContent = '測試中...';
+
+            const days = document.getElementById('daysSelect').value;
+            log(`開始測試 API 請求，天數: ${days}`);
+
+            try {
+                const response = await fetch('/api/dashboard/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: 'test_user',
+                        user_role: 'admin',
+                        chart_type: 'customer_analysis',
+                        start_date: null,  // 使用默認值
+                        end_date: null
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const text = await response.text();
+                apiResponse = JSON.parse(text);
+
+                log(`✅ API 請求成功`);
+                log(`返回數據類型: ${typeof apiResponse}`);
+                log(`success: ${apiResponse.success}`);
+                log(`has_permission: ${apiResponse.has_permission}`);
+
+                if (apiResponse.chart_config) {
+                    log(`chart_config.type: ${apiResponse.chart_config.type}`);
+                    log(`chart_config.data.labels: ${JSON.stringify(apiResponse.chart_config.data?.labels)}`);
+                    log(`chart_config.data.datasets 長度: ${apiResponse.chart_config.data?.datasets?.length}`);
+                }
+
+                if (apiResponse.chart_data) {
+                    log(`chart_data: ${JSON.stringify(apiResponse.chart_data)}`);
+                }
+
+                showResult(`<strong>✅ 步驟 1 完成：API 請求成功！</strong><br><br>
+                <pre>${JSON.stringify(apiResponse, null, 2)}</pre>`, 'success');
+
+                document.getElementById('testParseBtn').disabled = false;
+
+            } catch (error) {
+                log(`❌ API 請求失敗: ${error.message}`);
+                showResult(`<strong>❌ 步驟 1 失敗：API 請求錯誤</strong><br><br>
+                <strong>錯誤:</strong> ${error.message}<br>
+                <strong>堆棧:</strong><br><pre>${error.stack}</pre>`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '步驟 1: 測試 API';
+            }
+        }
+
+        function testParse() {
+            if (!apiResponse) {
+                showResult('請先執行步驟 1', 'error');
+                return;
+            }
+
+            log('開始測試數據解析...');
+
+            // 模擬 Vue 組件的數據處理邏輯
+            const chartConfig = apiResponse.chart_config;
+            const chartData = apiResponse.chart_data;
+
+            log(`解析 chart_config: ${JSON.stringify(chartConfig, null, 2)}`);
+
+            // 驗證數據結構
+            if (!chartConfig.data) {
+                log('❌ chart_config.data 不存在！');
+                showResult('❌ 數據結構錯誤：chart_config.data 不存在', 'error');
+                return;
+            }
+
+            if (!chartConfig.data.labels) {
+                log('❌ chart_config.data.labels 不存在！');
+                showResult('❌ 數據結構錯誤：labels 不存在', 'error');
+                return;
+            }
+
+            if (!chartConfig.data.datasets || chartConfig.data.datasets.length === 0) {
+                log('❌ chart_config.data.datasets 為空！');
+                showResult('❌ 數據結構錯誤：datasets 為空', 'error');
+                return;
+            }
+
+            log(`✅ 數據結構驗證通過`);
+            log(`標籤數量: ${chartConfig.data.labels.length}`);
+            log(`數據集數量: ${chartConfig.data.datasets.length}`);
+            log(`第一個數據集的數據點數量: ${chartConfig.data.datasets[0].data?.length || 0}`);
+
+            showResult(`<strong>✅ 步驟 2 完成：數據解析成功！</strong><br><br>
+            <strong>標籤:</strong> ${chartConfig.data.labels.join(', ')}<br>
+            <strong>數據:</strong> ${chartConfig.data.datasets[0].data.join(', ')}<br>
+            <strong>統計信息:</strong> ${JSON.stringify(chartData, null, 2)}`, 'success');
+
+            document.getElementById('testRenderBtn').disabled = false;
+        }
+
+        async function testRender() {
+            if (!apiResponse) {
+                showResult('請先執行步驟 1 和 2', 'error');
+                return;
+            }
+
+            const loadingDiv = document.getElementById('loading');
+            loadingDiv.style.display = 'block';
+
+            log('開始渲染圖表...');
+
+            try {
+                const canvas = document.getElementById('customerChart');
+
+                if (!canvas) {
+                    throw new Error('Canvas 元素不存在');
+                }
+
+                log('✅ Canvas 元素已找到');
+
+                // 銷毀舊圖表
+                if (chartInstance) {
+                    chartInstance.destroy();
+                    chartInstance = null;
+                    log('舊圖表已銷毀');
+                }
+
+                const ctx = canvas.getContext('2d');
+                const chartConfig = JSON.parse(JSON.stringify(apiResponse.chart_config));
+
+                // 更新標題
+                const days = document.getElementById('daysSelect').value;
+                if (chartConfig.options && chartConfig.options.plugins) {
+                    chartConfig.options.plugins.title = {
+                        display: true,
+                        text: `客戶消費分析 - 最近 ${days} 天`,
+                        font: {
+                            size: 16,
+                            weight: 'bold'
+                        }
+                    };
+                }
+
+                log(`創建圖表，類型: ${chartConfig.type}`);
+
+                chartInstance = new Chart(ctx, chartConfig);
+
+                log('✅ 圖表創建成功！');
+                log(`圖表 ID: ${chartInstance.id}`);
+
+                showResult(`<strong>✅ 步驟 3 完成：圖表渲染成功！</strong><br><br>
+                圖表已成功顯示在下方。`, 'success');
+
+            } catch (error) {
+                log(`❌ 渲染失敗: ${error.message}`);
+                log(`錯誤堆棧: ${error.stack}`);
+                showResult(`<strong>❌ 步驟 3 失敗：圖表渲染錯誤</strong><br><br>
+                <strong>錯誤:</strong> ${error.message}<br>
+                <strong>堆棧:</strong><br><pre>${error.stack}</pre>`, 'error');
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        function reset() {
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstance = null;
+            }
+
+            apiResponse = null;
+            logs.length = 0;
+            updateLogDisplay();
+
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('testParseBtn').disabled = true;
+            document.getElementById('testRenderBtn').disabled = true;
+            document.getElementById('loading').style.display = 'none';
+
+            log('✅ 已重置');
+        }
+
+        // 初始化
+        log('測試頁面已加載');
+        log('請點擊"步驟 1: 測試 API"開始測試');
+    </script>
+</body>
+</html>

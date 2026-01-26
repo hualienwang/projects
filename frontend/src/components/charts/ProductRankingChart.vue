@@ -33,7 +33,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto'
 import { useUserStore } from '@/stores/user'
 import { getProductRanking } from '@/api/dashboard'
@@ -63,10 +63,10 @@ const loadData = async () => {
     chartInstance.value.destroy()
     chartInstance.value = null
   }
-  
+
   loading.value = true
   error.value = ''
-  
+
   try {
     const response = await getProductRanking({
       user_id: userStore.userId,
@@ -74,34 +74,64 @@ const loadData = async () => {
       days: days.value,
       top_n: topN.value
     })
-    
+
     if (response.success && response.has_permission) {
+      // 先設置 loading = false，讓 Canvas 元素渲染
+      loading.value = false
+
+      // 等待 DOM 更新，確保 Canvas 元素已經渲染
+      await nextTick()
+      await nextTick()
+
       renderChart(response.chart_config)
       emit('data-loaded', response.chart_data)
     } else {
       error.value = response.message || '權限不足或數據加載失敗'
       emit('error', error.value)
+      loading.value = false
     }
   } catch (err) {
     console.error('加载商品排行数据失败:', err)
     error.value = '網絡錯誤，請稍後重試'
-    emit('error', error.value)
-  } finally {
     loading.value = false
+    emit('error', error.value)
   }
 }
 
 /**
  * 渲染图表
  */
-const renderChart = (config) => {
-  if (!chartRef.value) return
-  
+const renderChart = async (config) => {
+  console.log('[ProductRankingChart] 开始渲染图表...')
+
+  // 重試機制：等待 Canvas 元素渲染
+  let retryCount = 0
+  const maxRetries = 5
+
+  while (retryCount < maxRetries) {
+    if (chartRef.value) {
+      console.log('[ProductRankingChart] Canvas 元素已找到！')
+      break
+    }
+
+    console.warn('[ProductRankingChart] Canvas 元素不存在，等待 DOM 更新...')
+    await nextTick()
+    retryCount++
+  }
+
+  if (!chartRef.value) {
+    console.error('[ProductRankingChart] Canvas 元素不存在！')
+    return
+  }
+
   const ctx = chartRef.value.getContext('2d')
-  
+
+  // 深拷贝配置，避免修改原始数据
+  const chartConfig = JSON.parse(JSON.stringify(config))
+
   // 更新图表标题
-  if (config.options && config.options.plugins) {
-    config.options.plugins.title = {
+  if (chartConfig.options && chartConfig.options.plugins) {
+    chartConfig.options.plugins.title = {
       display: true,
       text: `商品銷售排行 Top ${topN.value} - 最近 ${days.value} 天`,
       font: {
@@ -110,8 +140,11 @@ const renderChart = (config) => {
       }
     }
   }
-  
-  chartInstance.value = new Chart(ctx, config)
+
+  console.log('[ProductRankingChart] Chart 配置:', chartConfig.type)
+
+  chartInstance.value = new Chart(ctx, chartConfig)
+  console.log('[ProductRankingChart] 图表创建成功！')
 }
 
 /**
@@ -123,8 +156,10 @@ watch(() => userStore.userRole, () => {
   }
 })
 
-onMounted(() => {
+onMounted(async () => {
   if (props.autoLoad) {
+    await nextTick()
+    await nextTick()
     loadData()
   }
 })

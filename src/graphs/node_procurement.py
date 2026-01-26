@@ -7,8 +7,8 @@ import uuid
 from sqlalchemy.orm import Session
 from langchain_core.runnables import RunnableConfig
 from langgraph.runtime import Runtime
-from coze_coding_dev_sdk.database import get_session
 from coze_coding_utils.runtime_ctx.context import Context
+from storage.database.db import get_session
 
 from graphs.state_procurement import (
     IdentifyProcurementNeedsInput, IdentifyProcurementNeedsOutput,

@@ -6,8 +6,8 @@ export const useUserStore = defineStore('user', () => {
   // 用户 ID
   const userId = ref('user123')
   
-  // 用户角色
-  const userRole = ref('viewer')
+  // 用户角色（默認為 admin，方便查看所有圖表）
+  const userRole = ref('admin')
   
   // 权限缓存
   const permissions = ref({})

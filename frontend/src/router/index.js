@@ -1,6 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from '@/views/Dashboard.vue'
-import APITestPage from '@/views/APITestPage.vue'
+import TestChart from '@/views/TestChart.vue'
+import DashboardSimple from '@/views/DashboardSimple.vue'
+import TestDashboardAPI from '@/views/TestDashboardAPI.vue'
+import DiagnoseAPI from '@/views/DiagnoseAPI.vue'
+import TestNavigation from '@/views/TestNavigation.vue'
+import WorkflowTest from '@/views/WorkflowTest.vue'
 
 const routes = [
   {
@@ -16,11 +21,51 @@ const routes = [
     redirect: '/'
   },
   {
-    path: '/api-test',
-    name: 'APITestPage',
-    component: APITestPage,
+    path: '/test-chart',
+    name: 'TestChart',
+    component: TestChart,
     meta: {
-      title: 'API測試面板 - 瓊林圖書進銷存系統'
+      title: 'Chart.js 測試頁面'
+    }
+  },
+  {
+    path: '/dashboard-simple',
+    name: 'DashboardSimple',
+    component: DashboardSimple,
+    meta: {
+      title: '簡化版 Dashboard - 診斷模式'
+    }
+  },
+  {
+    path: '/test-dashboard-api',
+    name: 'TestDashboardAPI',
+    component: TestDashboardAPI,
+    meta: {
+      title: 'Dashboard API 測試頁面'
+    }
+  },
+  {
+    path: '/diagnose-api',
+    name: 'DiagnoseAPI',
+    component: DiagnoseAPI,
+    meta: {
+      title: 'API 診斷工具'
+    }
+  },
+  {
+    path: '/test-navigation',
+    name: 'TestNavigation',
+    component: TestNavigation,
+    meta: {
+      title: 'Navigation 測試頁面'
+    }
+  },
+  {
+    path: '/workflow-test',
+    name: 'WorkflowTest',
+    component: WorkflowTest,
+    meta: {
+      title: '工作流 API 測試'
     }
   },
   {

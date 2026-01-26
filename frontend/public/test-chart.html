@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chart.js 独立测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        h2 {
+            color: #666;
+            margin-top: 0;
+        }
+        .chart-wrapper {
+            min-height: 400px;
+            background: #fafafa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            background: #409eff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #66b1ff;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #f0f9ff;
+            border-left: 4px solid #409eff;
+        }
+        .status.error {
+            background: #fef0f0;
+            border-left: 4px solid #f56c6c;
+        }
+        .status.info {
+            background: #f5f7fa;
+            border-left: 4px solid #909399;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chart.js 独立测试页面</h1>
+
+    <div class="container">
+        <h2>1. Chart.js 加载测试</h2>
+        <div id="chartjs-status" class="status info">正在检查...</div>
+    </div>
+
+    <div class="container">
+        <h2>2. 静态图表测试</h2>
+        <div class="chart-wrapper">
+            <canvas id="staticChart"></canvas>
+        </div>
+        <div id="static-status" class="status info">等待渲染...</div>
+    </div>
+
+    <div class="container">
+        <h2>3. API 测试</h2>
+        <button id="testApiBtn" onclick="testAPI()">测试 API</button>
+        <div id="api-status" class="status info">未测试</div>
+        <pre id="api-response" style="display: none;"></pre>
+    </div>
+
+    <div class="container">
+        <h2>4. API 数据图表测试</h2>
+        <button id="renderApiBtn" onclick="renderApiChart()" disabled>渲染 API 数据</button>
+        <div class="chart-wrapper">
+            <canvas id="apiChart"></canvas>
+        </div>
+        <div id="api-chart-status" class="status info">等待数据...</div>
+    </div>
+
+    <div class="container">
+        <h2>5. 调试信息</h2>
+        <div id="debug-info"></div>
+    </div>
+
+    <!-- 使用 CDN 加载 Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+    <script>
+        // 全局变量
+        let staticChart = null;
+        let apiChart = null;
+        let apiData = null;
+
+        // 1. 检查 Chart.js 是否加载
+        window.addEventListener('DOMContentLoaded', function() {
+            const statusDiv = document.getElementById('chartjs-status');
+            const debugDiv = document.getElementById('debug-info');
+
+            if (typeof Chart !== 'undefined') {
+                statusDiv.className = 'status success';
+                statusDiv.textContent = `✓ Chart.js 已加载，版本: ${Chart.version}`;
+            } else {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '✗ Chart.js 未能加载！';
+            }
+
+            // 显示调试信息
+            debugDiv.innerHTML = `
+                <p><strong>Chart.js:</strong> ${typeof Chart !== 'undefined' ? '已加载' : '未加载'}</p>
+                <p><strong>Chart.js 版本:</strong> ${Chart ? Chart.version : 'N/A'}</p>
+                <p><strong>用户代理:</strong> ${navigator.userAgent}</p>
+                <p><strong>URL:</strong> ${window.location.href}</p>
+            `;
+
+            // 创建静态图表
+            createStaticChart();
+        });
+
+        // 2. 创建静态图表
+        function createStaticChart() {
+            const statusDiv = document.getElementById('static-status');
+            const ctx = document.getElementById('staticChart');
+
+            try {
+                console.log('开始创建静态图表...');
+
+                const config = {
+                    type: 'line',
+                    data: {
+                        labels: ['一月', '二月', '三月', '四月', '五月', '六月'],
+                        datasets: [{
+                            label: '测试数据',
+                            data: [12, 19, 3, 5, 2, 3],
+                            borderColor: '#4CAF50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Chart.js 静态图表测试',
+                                font: { size: 16, weight: 'bold' }
+                            }
+                        }
+                    }
+                };
+
+                staticChart = new Chart(ctx, config);
+                statusDiv.className = 'status success';
+                statusDiv.textContent = '✓ 静态图表渲染成功！';
+                console.log('静态图表创建成功');
+            } catch (err) {
+                console.error('创建静态图表失败:', err);
+                statusDiv.className = 'status error';
+                statusDiv.textContent = `✗ 创建静态图表失败: ${err.message}`;
+            }
+        }
+
+        // 3. 测试 API
+        async function testAPI() {
+            const statusDiv = document.getElementById('api-status');
+            const responseDiv = document.getElementById('api-response');
+            const renderBtn = document.getElementById('renderApiBtn');
+
+            statusDiv.textContent = '正在测试 API...';
+            statusDiv.className = 'status info';
+            responseDiv.style.display = 'none';
+            renderBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/dashboard/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: 'test_user',
+                        user_role: 'admin',
+                        chart_type: 'sales_trend'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    statusDiv.className = 'status success';
+                    statusDiv.textContent = '✓ API 测试成功！';
+                    responseDiv.style.display = 'block';
+                    responseDiv.textContent = JSON.stringify(data, null, 2);
+                    apiData = data;
+                    renderBtn.disabled = false;
+                } else {
+                    throw new Error(data.message || 'API 返回错误');
+                }
+            } catch (err) {
+                console.error('API 测试失败:', err);
+                statusDiv.className = 'status error';
+                statusDiv.textContent = `✗ API 测试失败: ${err.message}`;
+            }
+        }
+
+        // 4. 渲染 API 数据图表
+        function renderApiChart() {
+            const statusDiv = document.getElementById('api-chart-status');
+            const ctx = document.getElementById('apiChart');
+
+            if (!apiData || !apiData.chart_config) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '✗ 没有 API 数据！';
+                return;
+            }
+
+            try {
+                console.log('开始渲染 API 数据图表...');
+                console.log('Chart config:', apiData.chart_config);
+
+                if (apiChart) {
+                    apiChart.destroy();
+                    apiChart = null;
+                }
+
+                apiChart = new Chart(ctx, apiData.chart_config);
+                statusDiv.className = 'status success';
+                statusDiv.textContent = '✓ API 数据图表渲染成功！';
+                console.log('API 数据图表渲染成功');
+            } catch (err) {
+                console.error('渲染 API 数据图表失败:', err);
+                statusDiv.className = 'status error';
+                statusDiv.textContent = `✗ 渲染失败: ${err.message}`;
+            }
+        }
+
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', function() {
+            if (staticChart) {
+                staticChart.destroy();
+            }
+            if (apiChart) {
+                apiChart.destroy();
+            }
+        });
+    </script>
+</body>
+</html>

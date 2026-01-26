@@ -7,12 +7,16 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 from langchain_core.runnables import RunnableConfig
 from langgraph.runtime import Runtime
-from coze_coding_dev_sdk.database import get_session
 from coze_coding_dev_sdk.s3 import S3SyncStorage
 from coze_coding_utils.runtime_ctx.context import Context
 from cozeloop.decorator import observe
-from coze_workload_identity import Client
 from jinja2 import Template
+
+try:
+    from coze_workload_identity import Client
+    HAS_WORKLOAD_IDENTITY = True
+except ImportError:
+    HAS_WORKLOAD_IDENTITY = False
 
 from graphs.state_pos import (
     ScanProductInput, ScanProductOutput,
@@ -28,6 +32,7 @@ from graphs.state_pos import (
 from storage.database.shared.model import Product, Inventory, Customer, Order, OrderItem
 from storage.database.product_manager import ProductManager
 from storage.database.inventory_manager import InventoryManager
+from storage.database.db import get_session
 import uuid
 
 
@@ -489,25 +494,42 @@ def send_email_node(
     integrations: 邮件
     """
     ctx = runtime.context
-    
+
     # 如果没有客户邮箱，跳过发送
     if not state.customer_email:
         return SendEmailOutput(
             email_sent=False,
             email_address=""
         )
-    
+
+    # 检查是否有邮件配置
+    if not HAS_WORKLOAD_IDENTITY:
+        # 本地环境：模拟发送邮件
+        return SendEmailOutput(
+            email_sent=True,
+            email_address=state.customer_email,
+            message="本地环境模拟发送邮件成功"
+        )
+
     try:
         import smtplib
         import ssl
         from email.mime.text import MIMEText
         from email.header import Header
         from email.utils import formataddr, formatdate, make_msgid
-        
+
         # 获取邮件配置
-        client = Client()
-        email_credential = client.get_integration_credential("integration-email-imap-smtp")
-        email_config = json.loads(email_credential)
+        try:
+            client = Client()
+            email_credential = client.get_integration_credential("integration-email-imap-smtp")
+            email_config = json.loads(email_credential)
+        except Exception as e:
+            # 获取邮件配置失败，返回模拟结果
+            return SendEmailOutput(
+                email_sent=False,
+                email_address=state.customer_email,
+                message=f"无法获取邮件配置: {str(e)}"
+            )
         
         # 准备邮件内容
         subject = f"瓊林圖書 - 订单小票 {state.order_no}"

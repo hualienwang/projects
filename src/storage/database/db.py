@@ -16,11 +16,25 @@ except Exception:
 
 def get_db_url() -> str:
     """Build database URL from environment."""
+    # 1. 首先嘗試從環境變量獲取
     url = os.getenv("PGDATABASE_URL") or ""
-    if url is not None and url != "":
+    if url and url != "":
         return url
-    from coze_workload_identity import Client
+
+    # 2. 本地開發模式：使用 SQLite（如果配置了本地數據庫文件）
+    sqlite_db = os.getenv("LOCAL_DB_FILE", "bookstore.db")
+    sqlite_path = os.path.join(os.getcwd(), sqlite_db)
+
+    # 檢查是否為本地開發環境
+    is_local_dev = os.getenv("COZE_PROJECT_ENV") == "LOCAL" or not os.getenv("COZE_WORKLOAD_IDENTITY_CLIENT_ID")
+
+    if is_local_dev:
+        logger.info(f"Local development mode detected, using SQLite: {sqlite_path}")
+        return f"sqlite:///{sqlite_path}"
+
+    # 3. 雲端環境：使用 Coze Workload Identity 獲取數據庫配置
     try:
+        from coze_workload_identity import Client
         client = Client()
         env_vars = client.get_project_env_vars()
         client.close()
@@ -29,12 +43,14 @@ def get_db_url() -> str:
                 url = env_var.value.replace("'", "'\\''")
                 return url
     except Exception as e:
-        logger.error(f"Error loading PGDATABASE_URL: {e}")
-        raise e
-    finally:
-        if url is None or url == "":
-            logger.error("PGDATABASE_URL is not set")
-    return url
+        logger.warning(f"Error loading PGDATABASE_URL from Coze: {e}")
+        logger.info(f"Falling back to SQLite: {sqlite_path}")
+        # 失敗時使用本地 SQLite 作為後備
+        return f"sqlite:///{sqlite_path}"
+
+    logger.error("PGDATABASE_URL is not set")
+    return f"sqlite:///{sqlite_path}"  # 最後的後備方案
+
 _engine = None
 _SessionLocal = None
 
@@ -43,10 +59,21 @@ def _create_engine_with_retry():
     if url is None or url == "":
         logger.error("PGDATABASE_URL is not set")
         raise ValueError("PGDATABASE_URL is not set")
-    size = 100
-    overflow = 100
-    recycle = 1800
-    timeout = 30
+
+    # 對於 SQLite，使用簡化的連接配置
+    if url.startswith("sqlite"):
+        size = 1
+        overflow = 0
+        recycle = 3600
+        timeout = 30
+        echo = True  # 本地開發時打印 SQL 語句
+    else:
+        size = 100
+        overflow = 100
+        recycle = 1800
+        timeout = 30
+        echo = False
+
     engine = create_engine(
         url,
         pool_size=size,
@@ -54,7 +81,9 @@ def _create_engine_with_retry():
         pool_pre_ping=True,
         pool_recycle=recycle,
         pool_timeout=timeout,
+        echo=echo
     )
+
     # 验证连接，带重试
     start_time = time.time()
     last_error = None
@@ -62,6 +91,7 @@ def _create_engine_with_retry():
         try:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
+            logger.info(f"Database connection successful: {url}")
             return engine
         except OperationalError as e:
             last_error = e

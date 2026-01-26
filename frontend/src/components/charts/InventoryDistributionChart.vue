@@ -40,7 +40,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import Chart from 'chart.js/auto'
 import { useUserStore } from '@/stores/user'
 import { getInventoryDistribution } from '@/api/dashboard'
@@ -63,17 +63,47 @@ const chartData = ref(null)
 
 // 库存摘要数据
 const inventoryData = computed(() => {
-  if (!chartData.value || !chartData.value.labels || !chartData.value.datasets) {
+  if (!chartData.value) {
     return null
   }
-  
+
+  // 优先使用 API 返回的结构化数据
+  if (chartData.value.low_stock !== undefined) {
+    return {
+      normal: (chartData.value.total_products || 0) - (chartData.value.low_stock || 0) - (chartData.value.out_of_stock || 0) - (chartData.value.overstock || 0),
+      low: chartData.value.low_stock || 0,
+      out: chartData.value.out_of_stock || 0
+    }
+  }
+
+  // 兼容图表数据结构
+  if (!chartData.value.labels || !chartData.value.datasets) {
+    return null
+  }
+
   const labels = chartData.value.labels
   const data = chartData.value.datasets[0].data
-  
+
+  // 支持多种标签名称
+  const getLabelIndex = (keywords) => {
+    for (let i = 0; i < labels.length; i++) {
+      for (const keyword of keywords) {
+        if (labels[i].includes(keyword)) {
+          return i
+        }
+      }
+    }
+    return -1
+  }
+
+  const normalIndex = getLabelIndex(['正常', 'normal'])
+  const lowIndex = getLabelIndex(['低庫存', '預警', 'low', 'warning'])
+  const outIndex = getLabelIndex(['庫存不足', '缺貨', 'out', 'danger'])
+
   return {
-    normal: data[labels.indexOf('正常庫存')] || 0,
-    low: data[labels.indexOf('低庫存預警')] || 0,
-    out: data[labels.indexOf('缺貨')] || 0
+    normal: normalIndex >= 0 ? (data[normalIndex] || 0) : 0,
+    low: lowIndex >= 0 ? (data[lowIndex] || 0) : 0,
+    out: outIndex >= 0 ? (data[outIndex] || 0) : 0
   }
 })
 
@@ -85,44 +115,73 @@ const loadData = async () => {
     chartInstance.value.destroy()
     chartInstance.value = null
   }
-  
+
   loading.value = true
   error.value = ''
-  
+
   try {
     const response = await getInventoryDistribution({
       user_id: userStore.userId,
       user_role: userStore.userRole
     })
-    
+
     if (response.success && response.has_permission) {
       chartData.value = response.chart_data
+      loading.value = false
+
+      // 等待 DOM 更新，確保 Canvas 元素已經渲染
+      await nextTick()
+      await nextTick()
+
       renderChart(response.chart_config)
       emit('data-loaded', response.chart_data)
     } else {
       error.value = response.message || '權限不足或數據加載失敗'
       emit('error', error.value)
+      loading.value = false
     }
   } catch (err) {
     console.error('加载库存分布数据失败:', err)
     error.value = '網絡錯誤，請稍後重試'
-    emit('error', error.value)
-  } finally {
     loading.value = false
+    emit('error', error.value)
   }
 }
 
 /**
  * 渲染图表
  */
-const renderChart = (config) => {
-  if (!chartRef.value) return
-  
+const renderChart = async (config) => {
+  console.log('[InventoryDistributionChart] 开始渲染图表...')
+
+  // 重試機制：等待 Canvas 元素渲染
+  let retryCount = 0
+  const maxRetries = 5
+
+  while (retryCount < maxRetries) {
+    if (chartRef.value) {
+      console.log('[InventoryDistributionChart] Canvas 元素已找到！')
+      break
+    }
+
+    console.warn('[InventoryDistributionChart] Canvas 元素不存在，等待 DOM 更新...')
+    await nextTick()
+    retryCount++
+  }
+
+  if (!chartRef.value) {
+    console.error('[InventoryDistributionChart] Canvas 元素不存在！')
+    return
+  }
+
   const ctx = chartRef.value.getContext('2d')
-  
+
+  // 深拷贝配置，避免修改原始数据
+  const chartConfig = JSON.parse(JSON.stringify(config))
+
   // 更新图表配置
-  if (config.options && config.options.plugins) {
-    config.options.plugins.title = {
+  if (chartConfig.options && chartConfig.options.plugins) {
+    chartConfig.options.plugins.title = {
       display: true,
       text: '庫存狀態分佈',
       font: {
@@ -130,8 +189,8 @@ const renderChart = (config) => {
         weight: 'bold'
       }
     }
-    
-    config.options.plugins.legend = {
+
+    chartConfig.options.plugins.legend = {
       position: 'bottom',
       labels: {
         padding: 20,
@@ -141,11 +200,14 @@ const renderChart = (config) => {
       }
     }
   }
-  
-  config.options.responsive = true
-  config.options.maintainAspectRatio = true
-  
-  chartInstance.value = new Chart(ctx, config)
+
+  chartConfig.options.responsive = true
+  chartConfig.options.maintainAspectRatio = true
+
+  console.log('[InventoryDistributionChart] Chart 配置:', chartConfig.type)
+
+  chartInstance.value = new Chart(ctx, chartConfig)
+  console.log('[InventoryDistributionChart] 图表创建成功！')
 }
 
 /**
@@ -157,8 +219,10 @@ watch(() => userStore.userRole, () => {
   }
 })
 
-onMounted(() => {
+onMounted(async () => {
   if (props.autoLoad) {
+    await nextTick()
+    await nextTick()
     loadData()
   }
 })

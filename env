@@ -1,0 +1,18 @@
+# 本地開發環境配置文件
+# 使用 SQLite 數據庫進行本地開發，無需額外安裝 PostgreSQL
+
+# 本地開發環境標識
+COZE_PROJECT_ENV=LOCAL
+
+# 本地數據庫文件路徑
+LOCAL_DB_FILE=bookstore.db
+
+# Coze Workload Identity 配置（本地開發可留空或使用模擬值）
+# 這些變量在本地開發時不需要真實值，只為了避免報錯
+COZE_WORKLOAD_IDENTITY_CLIENT_ID=
+COZE_WORKLOAD_IDENTITY_CLIENT_SECRET=
+COZE_WORKLOAD_IDENTITY_TOKEN_ENDPOINT=
+COZE_WORKLOAD_ACCESS_TOKEN_ENDPOINT=
+
+# WORKFLOW_TYPE=order_processing
+WORKFLOW_TYPE=stock_alert

@@ -9,10 +9,14 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.runtime import Runtime
 from coze_coding_dev_sdk import LLMClient
-from coze_coding_dev_sdk.database import get_session
 from coze_coding_utils.runtime_ctx.context import Context
 from cozeloop.decorator import observe
-from coze_workload_identity import Client
+
+try:
+    from coze_workload_identity import Client
+    HAS_WORKLOAD_IDENTITY = True
+except ImportError:
+    HAS_WORKLOAD_IDENTITY = False
 
 from graphs.state_sales import (
     CollectSalesDataInput, CollectSalesDataOutput,
@@ -22,6 +26,7 @@ from graphs.state_sales import (
     SendSalesReportInput, SendSalesReportOutput
 )
 from storage.database.shared.model import Order, OrderItem, Product, Inventory
+from storage.database.db import get_session
 from jinja2 import Template
 
 
@@ -181,22 +186,36 @@ def ai_analyze_sales_node(
     integrations: 大语言模型
     """
     ctx = runtime.context
-    
+
+    # 检查是否有 LLM API Key 配置
+    api_key = os.getenv("COZE_WORKLOAD_IDENTITY_API_KEY")
+    if not api_key:
+        # 本地环境：生成模拟的销售分析
+        analysis_result = generate_mock_sales_analysis(state.total_sales, state.total_orders, state.top_products)
+
+        return AIAnalyzeSalesOutput(
+            analysis_result=analysis_result,
+            insights=[]
+        )
+
     # 读取配置文件
-    cfg_file = os.path.join(os.getenv("COZE_WORKSPACE_PATH"), config['metadata']['llm_cfg'])
+    workspace_path = os.getenv("COZE_WORKSPACE_PATH")
+    if not workspace_path:
+        workspace_path = os.getcwd()
+    cfg_file = os.path.join(workspace_path, config['metadata']['llm_cfg'])
     with open(cfg_file, 'r', encoding='utf-8') as fd:
         _cfg = json.load(fd)
-    
+
     llm_config = _cfg.get("config", {})
     sp = _cfg.get("sp", "")
     up = _cfg.get("up", "")
-    
+
     # 准备数据
     top_products_summary = "\n".join([
         f"{i+1}. {p['product_name']} - 销量: {p['total_quantity']} - 金额: ¥{p['total_amount']:.2f}"
         for i, p in enumerate(state.top_products[:3], 1)
     ])
-    
+
     # 使用jinja2模板渲染提示词
     up_tpl = Template(up)
     user_prompt_content = up_tpl.render({
@@ -204,21 +223,21 @@ def ai_analyze_sales_node(
         "total_orders": state.total_orders,
         "top_products": top_products_summary
     })
-    
+
     # 调用大语言模型
     llm_client = LLMClient(ctx=ctx)
-    
+
     messages = [
         SystemMessage(content=sp),
         HumanMessage(content=user_prompt_content)
     ]
-    
+
     response = llm_client.invoke(
         messages=messages,
         model=llm_config.get("model", "doubao-seed-1-8-251228"),
         temperature=llm_config.get("temperature", 0.5)
     )
-    
+
     # 解析响应
     content = response.content
     if isinstance(content, str):
@@ -233,11 +252,49 @@ def ai_analyze_sales_node(
         analysis_result = " ".join(text_parts)
     else:
         analysis_result = str(content)
-    
+
     return AIAnalyzeSalesOutput(
         analysis_result=analysis_result,
         insights=[]
     )
+
+
+def generate_mock_sales_analysis(total_sales: float, total_orders: int, top_products: List[dict]) -> str:
+    """生成模拟的销售分析"""
+    lines = []
+
+    lines.append("【销售数据分析】")
+    lines.append("")
+
+    if total_orders == 0:
+        lines.append("本期暂无销售数据，建议加强营销推广活动。")
+        lines.append("")
+        return "\n".join(lines)
+
+    avg_order_value = total_sales / total_orders if total_orders > 0 else 0
+
+    lines.append(f"1. 【整体表现】")
+    lines.append(f"   - 本期总销售额为 ¥{total_sales:,.2f}，共完成 {total_orders} 笔订单")
+    lines.append(f"   - 平均订单金额为 ¥{avg_order_value:,.2f}")
+    lines.append("")
+
+    lines.append("2. 【热门商品】")
+    if top_products:
+        for i, p in enumerate(top_products[:3], 1):
+            lines.append(f"   Top{i}. {p['product_name']}")
+            lines.append(f"        销量: {p['total_quantity']} 本")
+            lines.append(f"        销售额: ¥{p['total_amount']:,.2f}")
+    else:
+        lines.append("   本期暂无销售记录")
+    lines.append("")
+
+    lines.append("3. 【建议】")
+    lines.append("   - 继续保持热门商品的库存充足")
+    lines.append("   - 对滞销商品考虑开展促销活动")
+    lines.append("   - 优化客户体验，提高复购率")
+    lines.append("")
+
+    return "\n".join(lines)
 
 
 # ==================== 节点4: 生成报告 ====================
@@ -322,11 +379,26 @@ def send_sales_report_node(
     integrations: 邮件
     """
     ctx = runtime.context
-    
+
+    # 检查是否有邮件配置
+    if not HAS_WORKLOAD_IDENTITY:
+        # 本地环境：模拟发送邮件
+        return SendSalesReportOutput(
+            report_sent=True,
+            message=f"本地环境模拟发送销售报告：{state.report_type}报"
+        )
+
     # 获取邮件配置
-    client_obj = Client()
-    email_credential = client_obj.get_integration_credential("integration-email-imap-smtp")
-    email_config = json.loads(email_credential)
+    try:
+        client_obj = Client()
+        email_credential = client_obj.get_integration_credential("integration-email-imap-smtp")
+        email_config = json.loads(email_credential)
+    except Exception as e:
+        # 获取邮件配置失败，返回模拟结果
+        return SendSalesReportOutput(
+            report_sent=False,
+            message=f"无法获取邮件配置: {str(e)}"
+        )
     
     import smtplib
     import ssl

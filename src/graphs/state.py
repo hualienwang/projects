@@ -5,10 +5,17 @@ from pydantic import BaseModel, Field
 # ==================== 全局状态 ====================
 class GlobalState(BaseModel):
     """库存预警工作流的全局状态"""
+    email_recipients: List[str] = Field(default=["manager@example.com"], description="邮件接收人列表")
+    check_overstock: bool = Field(default=False, description="是否检查库存积压")
     low_stock_products: List[dict] = Field(default=[], description="低库存商品列表")
+    overstock_products: List[dict] = Field(default=[], description="库存积压商品列表")
+    alert_count: int = Field(default=0, description="预警总数")
     alert_report: str = Field(default="", description="预警报告内容")
     alert_summary: dict = Field(default={}, description="预警摘要信息")
+    recommendations: str = Field(default="", description="补货建议")
     email_sent: bool = Field(default=False, description="邮件是否发送成功")
+    email_result: dict = Field(default={}, description="邮件发送结果详情")
+    recorded_count: int = Field(default=0, description="记录的预警数量")
 
 
 # ==================== 工作流输入输出 ====================

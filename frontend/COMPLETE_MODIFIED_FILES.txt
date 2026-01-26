@@ -1,0 +1,724 @@
+================================================================================
+修訂檔案完整內容歸檔
+================================================================================
+本文檔包含所有修改和新創建的文件的完整內容
+
+================================================================================
+1. frontend/src/components/charts/SalesTrendChart.vue (修改)
+================================================================================
+
+<template>
+  <div class="chart-container">
+    <div class="chart-header">
+      <h3>銷售趨勢分析</h3>
+      <div class="date-selector">
+        <select v-model="days" @change="loadData">
+          <option :value="7">最近 7 天</option>
+          <option :value="30">最近 30 天</option>
+          <option :value="90">最近 90 天</option>
+        </select>
+      </div>
+    </div>
+
+    <div v-if="loading" class="loading">
+      <div class="spinner"></div>
+      <p>載入中...</p>
+    </div>
+
+    <div v-else-if="error" class="error">
+      <p>{{ error }}</p>
+      <button @click="loadData" class="retry-btn">重試</button>
+    </div>
+
+    <div v-else class="chart-content" ref="chartContentRef">
+      <canvas ref="chartRef"></canvas>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import Chart from 'chart.js/auto'
+import { useUserStore } from '@/stores/user'
+import { getSalesTrend } from '@/api/dashboard'
+
+const props = defineProps({
+  autoLoad: {
+    type: Boolean,
+    default: true
+  }
+})
+
+const emit = defineEmits(['data-loaded', 'error'])
+
+const userStore = useUserStore()
+const chartRef = ref(null)
+const chartContentRef = ref(null)
+const chartInstance = ref(null)
+const loading = ref(false)
+const error = ref('')
+const days = ref(30)
+
+console.log('[SalesTrendChart] 组件已创建')
+
+/**
+ * 加载数据
+ */
+const loadData = async () => {
+  console.log('[SalesTrendChart] 开始加载数据...')
+
+  // 销毁现有图表
+  if (chartInstance.value) {
+    console.log('[SalesTrendChart] 销毁现有图表')
+    chartInstance.value.destroy()
+    chartInstance.value = null
+  }
+
+  loading.value = true
+  error.value = ''
+
+  try {
+    const response = await getSalesTrend({
+      user_id: userStore.userId,
+      user_role: userStore.userRole,
+      days: days.value
+    })
+
+    console.log('[SalesTrendChart] API 响应:', response)
+
+    if (response.success && response.has_permission) {
+      // 使用 nextTick 确保 DOM 完全渲染
+      await nextTick()
+      await renderChart(response.chart_config)
+      emit('data-loaded', response.chart_data)
+    } else {
+      error.value = response.message || '權限不足或數據加載失敗'
+      console.error('[SalesTrendChart]', error.value)
+      emit('error', error.value)
+    }
+  } catch (err) {
+    console.error('[SalesTrendChart] 加载销售趋势数据失败:', err)
+    console.error('[SalesTrendChart] 错误名称:', err.name)
+    console.error('[SalesTrendChart] 错误消息:', err.message)
+    console.error('[SalesTrendChart] 错误堆栈:', err.stack)
+
+    // 生成详细的错误信息
+    let errorMessage = '加载失败'
+
+    if (err.response) {
+      // 服务器返回了错误响应
+      errorMessage = `服务器错误: ${err.response.status} - ${err.response.statusText}`
+      console.error('[SalesTrendChart] 服务器响应:', err.response.data)
+    } else if (err.request) {
+      // 请求已发出但无响应
+      errorMessage = '网络错误: 无法连接到服务器'
+      console.error('[SalesTrendChart] 请求配置:', err.config)
+    } else {
+      // 其他错误
+      errorMessage = `错误: ${err.message}`
+    }
+
+    error.value = errorMessage
+    emit('error', errorMessage)
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 渲染图表
+ */
+const renderChart = async (config) => {
+  console.log('[SalesTrendChart] 开始渲染图表...')
+
+  // 检查 canvas 是否存在
+  if (!chartRef.value) {
+    console.error('[SalesTrendChart] Canvas 元素不存在！')
+    throw new Error('Canvas 元素不存在')
+  }
+
+  // 检查容器尺寸
+  if (chartContentRef.value) {
+    const rect = chartContentRef.value.getBoundingClientRect()
+    console.log('[SalesTrendChart] 容器尺寸:', {
+      width: rect.width,
+      height: rect.height,
+      display: window.getComputedStyle(chartContentRef.value).display
+    })
+
+    if (rect.width === 0 || rect.height === 0) {
+      console.warn('[SalesTrendChart] 容器尺寸为 0，等待渲染...')
+      await nextTick()
+    }
+  }
+
+  const ctx = chartRef.value.getContext('2d')
+  console.log('[SalesTrendChart] Canvas 上下文获取成功')
+
+  // 深拷贝配置，避免修改原始数据
+  const chartConfig = JSON.parse(JSON.stringify(config))
+
+  // 更新图表标题
+  if (chartConfig.options && chartConfig.options.plugins) {
+    chartConfig.options.plugins.title = {
+      display: true,
+      text: `銷售趨勢 - 最近 ${days.value} 天`,
+      font: {
+        size: 16,
+        weight: 'bold'
+      }
+    }
+  }
+
+  console.log('[SalesTrendChart] Chart 配置:', chartConfig.type)
+
+  chartInstance.value = new Chart(ctx, chartConfig)
+  console.log('[SalesTrendChart] 图表创建成功！')
+}
+
+/**
+ * 监听用户角色变化
+ */
+watch(() => userStore.userRole, () => {
+  console.log('[SalesTrendChart] 用户角色变化:', userStore.userRole)
+  if (props.autoLoad) {
+    loadData()
+  }
+})
+
+onMounted(async () => {
+  console.log('[SalesTrendChart] 组件已挂载')
+  if (props.autoLoad) {
+    // 使用 nextTick 确保 DOM 完全渲染
+    await nextTick()
+    loadData()
+  }
+})
+
+onBeforeUnmount(() => {
+  console.log('[SalesTrendChart] 组件即将卸载')
+  if (chartInstance.value) {
+    chartInstance.value.destroy()
+  }
+})
+
+defineExpose({
+  loadData
+})
+</script>
+
+<style scoped>
+.chart-container {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.chart-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.date-selector select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+.loading {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 20px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #4CAF50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error {
+  text-align: center;
+  padding: 60px 20px;
+  color: #721c24;
+  background: #f8d7da;
+  border-radius: 4px;
+}
+
+.retry-btn {
+  margin-top: 15px;
+  padding: 8px 20px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.retry-btn:hover {
+  background: #c82333;
+}
+
+.chart-content {
+  height: 400px;
+  position: relative;
+}
+</style>
+
+================================================================================
+2. frontend/src/router/index.js (修改)
+================================================================================
+
+import { createRouter, createWebHistory } from 'vue-router'
+import Dashboard from '@/views/Dashboard.vue'
+import TestChart from '@/views/TestChart.vue'
+import DashboardSimple from '@/views/DashboardSimple.vue'
+import TestDashboardAPI from '@/views/TestDashboardAPI.vue'
+
+const routes = [
+  {
+    path: '/',
+    name: 'Dashboard',
+    component: Dashboard,
+    meta: {
+      title: '數據儀表板 - 瓊林圖書進銷存系統'
+    }
+  },
+  {
+    path: '/dashboard',
+    redirect: '/'
+  },
+  {
+    path: '/test-chart',
+    name: 'TestChart',
+    component: TestChart,
+    meta: {
+      title: 'Chart.js 測試頁面'
+    }
+  },
+  {
+    path: '/dashboard-simple',
+    name: 'DashboardSimple',
+    component: DashboardSimple,
+    meta: {
+      title: '簡化版 Dashboard - 診斷模式'
+    }
+  },
+  {
+    path: '/test-dashboard-api',
+    name: 'TestDashboardAPI',
+    component: TestDashboardAPI,
+    meta: {
+      title: 'Dashboard API 測試頁面'
+    }
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/'
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes
+})
+
+// 路由标题设置
+router.beforeEach((to, from, next) => {
+  if (to.meta.title) {
+    document.title = to.meta.title
+  }
+  next()
+})
+
+export default router
+
+================================================================================
+3. frontend/src/views/DashboardSimple.vue (新建)
+================================================================================
+
+請查看前面已讀取的完整內容
+
+================================================================================
+4. frontend/src/views/TestDashboardAPI.vue (新建)
+================================================================================
+
+請查看前面已讀取的完整內容
+
+================================================================================
+5. frontend/public/api-test.html (新建)
+================================================================================
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API 連接診斷測試</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 0;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .test-section.success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .test-section.error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .test-section.info {
+            background: #d1ecf1;
+            border-color: #bee5eb;
+        }
+        .status {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .status.success {
+            color: #155724;
+        }
+        .status.error {
+            color: #721c24;
+        }
+        .status.info {
+            color: #0c5460;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .response {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        .info-table th, .info-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .info-table th {
+            background: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 API 連接診斷測試</h1>
+        
+        <div class="test-section info">
+            <h2>環境信息</h2>
+            <table class="info-table">
+                <tr>
+                    <th>項目</th>
+                    <th>值</th>
+                </tr>
+                <tr>
+                    <td>當前頁面 URL</td>
+                    <td id="pageUrl"></td>
+                </tr>
+                <tr>
+                    <td>API 基礎路徑</td>
+                    <td>/api</td>
+                </tr>
+                <tr>
+                    <td>預期後端地址</td>
+                    <td>http://localhost:5000</td>
+                </tr>
+                <tr>
+                    <td>當前時間</td>
+                    <td id="currentTime"></td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="test-section">
+            <h2>測試 1: 獲取可用圖表列表</h2>
+            <div class="status" id="test1Status">準備中...</div>
+            <button onclick="testGetCharts()" id="test1Btn">開始測試</button>
+            <div class="response" id="test1Response">等待測試...</div>
+        </div>
+
+        <div class="test-section">
+            <h2>測試 2: 獲取權限信息</h2>
+            <div class="status" id="test2Status">準備中...</div>
+            <button onclick="testGetPermissions()" id="test2Btn">開始測試</button>
+            <div class="response" id="test2Response">等待測試...</div>
+        </div>
+
+        <div class="test-section">
+            <h2>測試 3: 生成銷售趨勢圖</h2>
+            <div class="status" id="test3Status">準備中...</div>
+            <button onclick="testGenerateSalesTrend()" id="test3Btn">開始測試</button>
+            <div class="response" id="test3Response">等待測試...</div>
+        </div>
+
+        <div class="test-section">
+            <h2>測試 4: 直接訪問後端 API</h2>
+            <div class="status" id="test4Status">準備中...</div>
+            <button onclick="testDirectBackend()" id="test4Btn">開始測試</button>
+            <div class="response" id="test4Response">等待測試...</div>
+        </div>
+
+        <div class="test-section info">
+            <h2>診斷建議</h2>
+            <div id="diagnosticAdvice">
+                <p>請依次執行以上測試，根據結果判斷問題：</p>
+                <ul>
+                    <li>如果 <strong>測試 4</strong> 成功，說明後端 API 正常，問題在前端代理</li>
+                    <li>如果 <strong>測試 1-3</strong> 都失敗，說明前端代理配置有問題</li>
+                    <li>如果 <strong>所有測試</strong> 都失敗，說明後端服務未運行</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 顯示環境信息
+        document.getElementById('pageUrl').textContent = window.location.href;
+        document.getElementById('currentTime').textContent = new Date().toLocaleString('zh-TW');
+
+        // API 基礎配置
+        const API_BASE = '/api';
+
+        // 顯示測試結果
+        function showResult(testId, success, message, response) {
+            const section = document.getElementById(testId).parentElement;
+            const statusEl = document.getElementById(testId + 'Status');
+            const responseEl = document.getElementById(testId + 'Response');
+            const btn = document.getElementById(testId + 'Btn');
+
+            section.classList.remove('success', 'error', 'info');
+            statusEl.classList.remove('success', 'error', 'info');
+
+            if (success) {
+                section.classList.add('success');
+                statusEl.classList.add('success');
+                statusEl.textContent = '✅ 成功: ' + message;
+            } else {
+                section.classList.add('error');
+                statusEl.classList.add('error');
+                statusEl.textContent = '❌ 失敗: ' + message;
+            }
+
+            responseEl.textContent = response;
+            btn.disabled = false;
+        }
+
+        // 測試 1: 獲取可用圖表列表
+        async function testGetCharts() {
+            document.getElementById('test1Btn').disabled = true;
+            document.getElementById('test1Status').textContent = '⏳ 執行中...';
+
+            try {
+                const response = await fetch(`${API_BASE}/dashboard/charts`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                showResult(
+                    'test1',
+                    response.ok,
+                    response.ok ? 'API 返回成功' : `HTTP ${response.status}`,
+                    JSON.stringify(data, null, 2)
+                );
+            } catch (error) {
+                showResult(
+                    'test1',
+                    false,
+                    error.message,
+                    `錯誤詳情:\n${error.name}: ${error.message}\n\n堆棧:\n${error.stack}`
+                );
+            }
+        }
+
+        // 測試 2: 獲取權限信息
+        async function testGetPermissions() {
+            document.getElementById('test2Btn').disabled = true;
+            document.getElementById('test2Status').textContent = '⏳ 執行中...';
+
+            try {
+                const response = await fetch(`${API_BASE}/dashboard/permissions/viewer`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                showResult(
+                    'test2',
+                    response.ok,
+                    response.ok ? '權限查詢成功' : `HTTP ${response.status}`,
+                    JSON.stringify(data, null, 2)
+                );
+            } catch (error) {
+                showResult(
+                    'test2',
+                    false,
+                    error.message,
+                    `錯誤詳情:\n${error.name}: ${error.message}\n\n堆棧:\n${error.stack}`
+                );
+            }
+        }
+
+        // 測試 3: 生成銷售趨勢圖
+        async function testGenerateSalesTrend() {
+            document.getElementById('test3Btn').disabled = true;
+            document.getElementById('test3Status').textContent = '⏳ 執行中...';
+
+            try {
+                const response = await fetch(`${API_BASE}/dashboard/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: 'test_user',
+                        user_role: 'viewer',
+                        chart_type: 'sales_trend'
+                    })
+                });
+
+                const data = await response.json();
+                showResult(
+                    'test3',
+                    response.ok,
+                    response.ok ? '圖表生成成功' : `HTTP ${response.status}`,
+                    JSON.stringify(data, null, 2)
+                );
+            } catch (error) {
+                showResult(
+                    'test3',
+                    false,
+                    error.message,
+                    `錯誤詳情:\n${error.name}: ${error.message}\n\n堆棧:\n${error.stack}`
+                );
+            }
+        }
+
+        // 測試 4: 直接訪問後端 API（不使用代理）
+        async function testDirectBackend() {
+            document.getElementById('test4Btn').disabled = true;
+            document.getElementById('test4Status').textContent = '⏳ 執行中...';
+
+            try {
+                const response = await fetch('http://localhost:5000/api/dashboard/charts', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                showResult(
+                    'test4',
+                    response.ok,
+                    response.ok ? '直接連接後端成功' : `HTTP ${response.status}`,
+                    JSON.stringify(data, null, 2)
+                );
+            } catch (error) {
+                showResult(
+                    'test4',
+                    false,
+                    error.message,
+                    `錯誤詳情:\n${error.name}: ${error.message}\n\n堆棧:\n${error.stack}`
+                );
+            }
+        }
+
+        // 頁面加載完成後自動運行測試 1
+        window.addEventListener('load', () => {
+            console.log('📊 API 診斷頁面已加載');
+            console.log('💡 請點擊上方按鈕進行測試');
+        });
+    </script>
+</body>
+</html>
+
+================================================================================
+6. frontend/public/test-api-simple.html (新建)
+================================================================================
+
+請查看前面創建的文件內容
+
+================================================================================
+文檔結束
+================================================================================

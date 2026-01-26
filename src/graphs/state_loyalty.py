@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class LoyaltyGlobalState(BaseModel):
     """客户忠诚度管理工作流的全局状态"""
     customer_id: int = Field(default=0, description="客户ID")
+    order_amount: float = Field(default=0.0, description="本次订单金额")
     customer_info: dict = Field(default={}, description="客户信息")
     purchase_history: List[dict] = Field(default=[], description="购买历史")
     current_points: int = Field(default=0, description="当前积分")
@@ -14,6 +15,7 @@ class LoyaltyGlobalState(BaseModel):
     current_level: str = Field(default="", description="当前会员等级")
     new_level: str = Field(default="", description="新会员等级")
     level_upgraded: bool = Field(default=False, description="是否升级")
+    notification_type: str = Field(default="", description="通知类型（level_up/birthday/promotion）")
     loyalty_report: str = Field(default="", description="忠诚度报告")
     notification_sent: bool = Field(default=False, description="通知是否发送")
 
@@ -115,7 +117,7 @@ class GenerateLoyaltyReportOutput(BaseModel):
 class SendLoyaltyNotificationInput(BaseModel):
     """发送通知节点输入"""
     customer_id: int = Field(..., description="客户ID")
-    notification_type: str = Field(..., description="通知类型: level_up/birthday/promotion")
+    notification_type: str = Field(default="", description="通知类型: level_up/birthday/promotion")
     report: str = Field(default="", description="报告内容")
 
 

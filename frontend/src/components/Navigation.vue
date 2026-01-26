@@ -2,102 +2,169 @@
   <nav class="navigation">
     <div class="nav-container">
       <div class="nav-brand">
-        <h2>琼林图书进销存系统</h2>
+        <h1>📊 瓊林圖書進銷存系統</h1>
       </div>
-      <ul class="nav-menu">
-        <li class="nav-item">
-          <router-link to="/" class="nav-link" :class="{ active: $route.path === '/' }">
-            <span class="icon">📊</span>
-            <span>仪表板</span>
-          </router-link>
-        </li>
-        <li class="nav-item">
-          <router-link to="/api-test" class="nav-link" :class="{ active: $route.path === '/api-test' }">
-            <span class="icon">🔧</span>
-            <span>API测试</span>
-          </router-link>
-        </li>
-      </ul>
+
+      <div class="nav-menu">
+        <router-link to="/" class="nav-link" active-class="active">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">數據儀表板</span>
+        </router-link>
+
+        <router-link to="/test-chart" class="nav-link" active-class="active">
+          <span class="nav-icon">📈</span>
+          <span class="nav-text">圖表測試</span>
+        </router-link>
+
+        <router-link to="/dashboard-simple" class="nav-link" active-class="active">
+          <span class="nav-icon">🔍</span>
+          <span class="nav-text">診斷模式</span>
+        </router-link>
+
+        <router-link to="/test-dashboard-api" class="nav-link" active-class="active">
+          <span class="nav-icon">🧪</span>
+          <span class="nav-text">API 測試</span>
+        </router-link>
+
+        <router-link to="/diagnose-api" class="nav-link" active-class="active">
+          <span class="nav-icon">🔧</span>
+          <span class="nav-text">API 診斷</span>
+        </router-link>
+
+        <router-link to="/workflow-test" class="nav-link" active-class="active">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">工作流測試</span>
+        </router-link>
+      </div>
+
+      <div class="nav-user">
+        <div class="user-info">
+          <span class="user-avatar">👤</span>
+          <span class="user-name">{{ userName }}</span>
+        </div>
+      </div>
     </div>
   </nav>
 </template>
 
 <script setup>
-// Navigation component for switching between dashboard and API test page
+import { ref } from 'vue'
+
+const userName = ref('Admin')
 </script>
 
 <style scoped>
 .navigation {
-  background-color: #2c3e50;
-  padding: 0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 1000;
 }
 
 .nav-container {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
 }
 
-.nav-brand h2 {
+.nav-brand h1 {
   color: white;
+  font-size: 18px;
   margin: 0;
-  font-size: 1.5rem;
+  white-space: nowrap;
 }
 
 .nav-menu {
   display: flex;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  gap: 10px;
-}
-
-.nav-item {
-  margin: 0;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .nav-link {
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 15px 20px;
-  color: #bdc3c7;
-  text-decoration: none;
+  gap: 6px;
   transition: all 0.3s ease;
-  border-radius: 4px;
+  font-size: 14px;
 }
 
 .nav-link:hover {
-  background-color: #34495e;
-  color: #ecf0f1;
-}
-
-.nav-link.active {
-  background-color: #3498db;
+  background: rgba(255, 255, 255, 0.2);
   color: white;
 }
 
-.icon {
-  font-size: 1.2em;
+.nav-link.active {
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+  font-weight: 600;
+}
+
+.nav-icon {
+  font-size: 16px;
+}
+
+.nav-text {
+  white-space: nowrap;
+}
+
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+.user-avatar {
+  font-size: 16px;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 500;
 }
 
 @media (max-width: 768px) {
   .nav-container {
     flex-direction: column;
-    gap: 10px;
+    height: auto;
     padding: 10px;
   }
-  
+
+  .nav-brand h1 {
+    font-size: 16px;
+    margin-bottom: 10px;
+  }
+
   .nav-menu {
     width: 100%;
     justify-content: center;
+  }
+
+  .nav-link {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .nav-user {
+    display: none;
   }
 }
 </style>
